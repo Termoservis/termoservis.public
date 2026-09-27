@@ -1,5 +1,5 @@
 import { createServer } from "node:http";
-import { readFile, mkdir, stat } from "node:fs/promises";
+import { readFile, mkdir, stat, copyFile } from "node:fs/promises";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
@@ -57,35 +57,61 @@ try {
   ]) {
     for (const device of ["mobile", "desktop"]) {
       const output = path.join(reportRoot, `${page.name}-${device}`);
-      const args = [
-        path.join(root, "node_modules/lighthouse/cli/index.js"),
-        `${url}${page.path}`,
-        "--chrome-flags=--headless",
-        "--quiet",
-        "--only-categories=performance,accessibility,best-practices,seo",
-        "--output=json",
-        "--output=html",
-        `--output-path=${output}`,
-      ];
-      if (device === "desktop") args.push("--preset=desktop");
-      await new Promise((resolve, reject) => {
-        const child = spawn(process.execPath, args, { stdio: "inherit" });
-        child.on("error", reject);
-        child.on("exit", (code) =>
-          code === 0
-            ? resolve()
-            : reject(new Error(`Lighthouse exited with ${code}`)),
+      const samples = [];
+      // Use three cold-browser runs so a single busy CI runner does not decide the result.
+      for (let run = 1; run <= 3; run++) {
+        const runOutput = `${output}-run-${run}`;
+        const args = [
+          path.join(root, "node_modules/lighthouse/cli/index.js"),
+          `${url}${page.path}`,
+          "--chrome-flags=--headless",
+          "--quiet",
+          "--only-categories=performance,accessibility,best-practices,seo",
+          "--output=json",
+          "--output=html",
+          `--output-path=${runOutput}`,
+        ];
+        if (device === "desktop") args.push("--preset=desktop");
+        await new Promise((resolve, reject) => {
+          const child = spawn(process.execPath, args, { stdio: "inherit" });
+          child.on("error", reject);
+          child.on("exit", (code) =>
+            code === 0
+              ? resolve()
+              : reject(new Error(`Lighthouse exited with ${code}`)),
+          );
+        });
+        const report = JSON.parse(
+          await readFile(`${runOutput}.report.json`, "utf8"),
         );
-      });
-      const report = JSON.parse(
-        await readFile(`${output}.report.json`, "utf8"),
-      );
-      if (report.runtimeError) throw new Error(report.runtimeError.message);
-      for (const [name, category] of Object.entries(report.categories)) {
+        if (report.runtimeError) throw new Error(report.runtimeError.message);
+        samples.push({ report, output: runOutput });
         console.log(
-          `${page.name} ${device} ${name}: ${Math.round(category.score * 100)}/100`,
+          `${page.name} ${device} run ${run}: ${Math.round(report.categories.performance.score * 100)}/100`,
         );
-        if (category.score === null || category.score < 0.95)
+      }
+      const median = (values) => values.toSorted((a, b) => a - b)[1];
+      const representative = samples.toSorted(
+        (a, b) =>
+          a.report.categories.performance.score -
+          b.report.categories.performance.score,
+      )[1];
+      for (const extension of ["json", "html"]) {
+        await copyFile(
+          `${representative.output}.report.${extension}`,
+          `${output}.report.${extension}`,
+        );
+      }
+      const report = representative.report;
+      if (report.runtimeError) throw new Error(report.runtimeError.message);
+      for (const name of Object.keys(report.categories)) {
+        const score = median(
+          samples.map((s) => s.report.categories[name].score),
+        );
+        console.log(
+          `${page.name} ${device} ${name} median: ${Math.round(score * 100)}/100`,
+        );
+        if (score === null || score < 0.95)
           failures.push(`${page.name} ${device} ${name} below 95`);
       }
       const budgets = {
@@ -95,9 +121,11 @@ try {
         "total-byte-weight": 250 * 1024,
       };
       for (const [metric, budget] of Object.entries(budgets)) {
-        const actual = report.audits[metric].numericValue;
+        const actual = median(
+          samples.map((s) => s.report.audits[metric].numericValue),
+        );
         console.log(
-          `${page.name} ${device} ${metric}: ${actual.toFixed(2)} (budget ${budget})`,
+          `${page.name} ${device} ${metric} median: ${actual.toFixed(2)} (budget ${budget})`,
         );
         if (!Number.isFinite(actual) || actual > budget)
           failures.push(`${page.name} ${device} ${metric} exceeds ${budget}`);

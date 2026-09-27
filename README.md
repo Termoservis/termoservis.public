@@ -29,7 +29,7 @@ Netlify reads `netlify.toml`, runs `npm run build`, and publishes only `dist/`. 
 npm run audit
 ```
 
-This builds the site, starts an ephemeral loopback server, and runs Lighthouse 13.5.0 on both pages in mobile and desktop modes. Chrome is discovered automatically; set `CHROME_PATH` if needed. HTML and JSON reports are written to `.lighthouse/`.
+This builds the site, starts an ephemeral loopback server, and runs Lighthouse 13.5.0 on both pages in mobile and desktop modes. Chrome is discovered automatically; set `CHROME_PATH` if needed. Each page/device combination uses three cold-browser runs; budgets use the median of each metric to limit CI host noise. All runs and representative HTML/JSON reports are saved to `.lighthouse/`.
 
 The same check runs on pull requests and pushes to `master`. It fails if either page exceeds any of these limits:
 
@@ -50,6 +50,8 @@ Initial controlled comparison against the original website at `9581b8b`, using t
 | Termoservis MD | 100 | 100 |
 
 Both new pages scored 100 for accessibility, best practices, and SEO in these runs. These are Lighthouse lab results, not a guarantee of an identical public PageSpeed Insights score or field Core Web Vitals. Hosting, device, network, and audit conditions affect measurements.
+
+For hosted performance checks, use the immutable Netlify deploy permalink rather than the `deploy-preview` URL. The preview URL injects the Netlify feedback drawer and its third-party resources, which are not part of the production website. [Netlify documentation](https://docs.netlify.com/deploy/review-deploys/netlify-drawer-for-feedback/overview/#site--browser-requirements-to-use-netlify-drawer).
 
 Performance choices: responsive WebP photos; explicit image dimensions; lazy-loaded team photos; system fonts; a small deferred script; no analytics, third-party embeds, or web-font requests. Videos and the chimney PDF load only when a visitor opens their links. Netlify asset cache rules are in `_headers`; change asset filenames when replacing cached images.
 
