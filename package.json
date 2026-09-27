@@ -1,0 +1,19 @@
+{
+  "name": "termoservis-public",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Static company website; Node.js is only used for development audits.",
+  "engines": {
+    "node": ">=22.19"
+  },
+  "scripts": {
+    "audit": "node Scripts/audit.mjs",
+    "format": "prettier --write index.html md/index.html Styles/site.css Scripts/site.js Scripts/*.mjs",
+    "build": "node Scripts/build.mjs",
+    "preaudit": "npm run build"
+  },
+  "devDependencies": {
+    "lighthouse": "13.5.0",
+    "prettier": "3.8.3"
+  }
+}
