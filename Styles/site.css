@@ -1284,15 +1284,23 @@ address {
 }
 .footer-brand {
   display: block;
-  background: white;
-  padding: 14px 18px;
-  border-radius: 3px;
   width: fit-content;
   max-width: 280px;
 }
 .footer-brand img {
   width: 100%;
   height: auto;
+  /* Blend the original artwork's white background into the dark footer. */
+  filter: invert(1) hue-rotate(180deg);
+  mix-blend-mode: screen;
+}
+.footer-social {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.facebook-icon {
+  flex-shrink: 0;
 }
 .legal-grid {
   grid-template-columns: 1fr;
@@ -1384,6 +1392,20 @@ address {
 .team-grid figcaption {
   padding-top: 20px;
 }
+.team-portrait {
+  width: 152px;
+  max-width: 100%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  overflow: hidden;
+}
+.team-grid .portrait-domagoj {
+  width: 100%;
+  border-radius: 0;
+  object-position: center 55%;
+  transform: scale(1.2);
+  transform-origin: 20% 45%;
+}
 .team-grid strong {
   font-size: 1rem;
 }
@@ -1430,7 +1452,8 @@ address {
     grid-template-columns: 1fr 1fr;
     gap: 12px 24px;
   }
-  .team-grid img {
+  .team-grid img,
+  .team-portrait {
     width: 136px;
   }
 }
